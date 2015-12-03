@@ -154,17 +154,19 @@ private:
 	string						file_name;
 	size_t						traces;
 	size_t						samples;
+	FILE						*segy_file;
 
 private:
 	SegyReader(){}
+	SegyReader( const string _file_name );
 	~SegyReader(){}
 
 public:
-	static SegyReader			*getInstance();
+	static SegyReader			*getInstance( const string file_name );
 	bool						destroy();
 	const SegyBinaryHeader		*getSegyBinaryHeader();
-	const SegyTraceHeader		*getSegyTraceHeader( size_t trace_num );
-	const float					getSegyData(size_t trace_num, size_t sample_num);
+	const SegyTraceHeader		*getSegyTraceHeader( const size_t trace_num );
+	const float					getSegyData( const size_t trace_num, const size_t sample_num);
 	const size_t				getTracesNum() const;
 	const size_t				getTraceSamplesNum() const;
 }; 
