@@ -74,10 +74,12 @@ typedef struct SegyTraceHeader{
 	int_32 energy_source_point_number;										// 17-20   4   震源点号
 	int_32 cdp_ensemble_number;												// 21-24   4*  CDP号(或CMP, CRP)
 	int_32 trace_sequence_number_within_cdp_ensemble;						// 25-28   4*  在CDP道集中的道号。每个道集的起始道号为1
+
 	int_16 trace_identification_code;										// 29-30   2   道识别
 	int_16 number_of_vertically_summed_traces_yielding_this_trace;			// 31-32   2   垂直叠加字，本道由多少道叠加而成
 	int_16 number_of_horizontally_stacked_traced_yielding_this_trace;		// 33-34   2   CDP覆盖次数
 	int_16 data_use;														// 35-36   2   数据性质，1=成果，2=实验
+
 	int_32 distance_from_source_point_to_receiver_group;					// 37-40   4*  炮点到检波点距离（负值表示与测线放炮方向相反）
 	int_32 receiver_group_elevation;										// 41-44   4   检波器的高度；在海平面以上为正，以下为负
 	int_32 surface_elevation_at_source;										// 45-48   4   震源的水平高度
@@ -86,32 +88,31 @@ typedef struct SegyTraceHeader{
 	int_32 datum_elevation_at_source;										// 57-60   4   震源的海拔
 	int_32 water_depth_at_source;											// 61-64   4   震源的水深
 	int_32 water_depth_at_receiver_group;									// 65-68   4   检波器的水深
+
 	int_16 scalar_for_elevations_and_depths;								// 69-70   2   比例因子，对字节41~68的高程和深度使用比例因子后求得真值。比例因子为1、±10、±100、±1000或±10000，如果为正，乘上
 	int_16 scalar_for_coordinates;											// 71-72   2   比例因子，对字节73～88、199～206的高程和深度使用比例因子后求得真值。比例因子为1、±10、±100、±1000或±10000，如果为正，乘上比例因子；如果为负，除以比例因子。
+	
 	int_32 x_source_coordinate;												// 73-76   4   震源的坐标-X
 	int_32 y_source_coordinate;												// 77-80   4   震源的坐标-Y
 	int_32 x_receiver_group_coordinate;										// 81-84   4   检波器的坐标-X
 	int_32 y_receiver_group_coordinate;										// 85-88   4   检波器的坐标-Y
-	int_16 coordinate_units;												// 89-90   2   坐标单位：1=长度（米或英尺） 2=弧度的秒
 
+	int_16 coordinate_units;												// 89-90   2   坐标单位：1=长度（米或英尺） 2=弧度的秒
 	int_16 weathering_velocity;												// 91-92   2   风化层速度
 	int_16 subweathering_velocity;											// 93-94   2   降速层速度
 	int_16 uphole_time_at_source;											// 95-96   2   在震源处的井口时间
 	int_16 uphole_time_at_group;											// 97-98   2   在检波点处的井口时间
 	int_16 source_static_correction;										// 99-100  2   炮点静校正
-
 	int_16 group_static_correction;											// 101-102 2   检波器静校正
 	int_16 total_static_applied;											// 103-104 2   应用的总静校正量（如果未使用，则为零）
 	int_16 lag_time_a;														// 105-106 2   延迟时间A（ms）。记录的第一个样点和时间信号之间的时间。240字节道标识头与时间信号之间的时间。如果为正，时间信号出现在道标识头结束之后；如果为负，时间信号出现在道标识头结束之前
 	int_16 lag_time_b;														// 107-108 2   延迟时间B（ms）。时间信号和震源起爆时间之间的时间
 	int_16 delay_according_time;											// 109-110 2   延迟记录时间（ms）。震源起爆时间和开始记录采样时间之间的时间（深水时使用）
-
 	int_16 mute_time_start;													// 111-112 2   起始切除时间  //brute_time_start
 	int_16 mute_time_end;													// 113-114 2   终了切除时间
 	int_16 samples_in_this_trace;											// 115-116 2*  本道采样点数
 	int_16 sample_intervall;												// 117-118 2*  采样间隔
 	int_16 gain_type_instruments;											// 119-120 2   野外仪器的增益类型：1=固定 2=二进制 3=浮点型 4=可选的其它
-
 	int_16 igc;																// 121-122 2   仪器增益常数
 	int_16 igi;																// 123-124 2   仪器早期和最初的增益
 	int_16 corr;															// 125-126 2   相关性：1=没有 2=有
@@ -166,8 +167,13 @@ public:
 	bool						destroy();
 	const SegyBinaryHeader		*getSegyBinaryHeader();
 	const SegyTraceHeader		*getSegyTraceHeader( const size_t trace_num );
-	const float					getSegyData( const size_t trace_num, const size_t sample_num);
+	const float					getSegyData( const size_t trace_num, const size_t sample_num );
 	const size_t				getTracesNum() const;
 	const size_t				getTraceSamplesNum() const;
-}; 
+
+private:
+	bool						convertBinary( void* data, size_t size ) const;
+	void						swapSegyBinaryHeader( SegyBinaryHeader* segy_bin_hdr ) const;
+	void						swapSegyTraceHeader( SegyTraceHeader* segy_trace_hdr ) const;
+};
 #endif
