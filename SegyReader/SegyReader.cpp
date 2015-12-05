@@ -1,7 +1,8 @@
 #include "SegyReader.h"
 
 SegyReader* SegyReader::instance = nullptr;
-
+const unsigned int data_bytes[] = { 4, 4, 2, 4, 4, 1 };
+ 
 void swapByte2( int_16 *data ){
 	unsigned char tmp = 0;
 	tmp = data[0];
@@ -156,11 +157,13 @@ bool SegyReader::destroy(){
 }
 
 SegyReader::SegyReader( const string _file_name ){
-	
 	if ( nullptr == (segy_file = fopen( _file_name.c_str(), "rb" )) ){
 		fprintf( stderr, "ReadSegy: Cannot open segy file - %s\n", _file_name.c_str() );
 	} else {
 		file_name = _file_name;
+		samples = _getSamples();
+		traces = _getTraces();
+		data_format = _getDataFormat();
 	}
 }
 
@@ -173,7 +176,7 @@ SegyReader* SegyReader::getInstance( const string file_name ){
 	}
 }
 
-const SegyBinaryHeader* SegyReader::getSegyBinaryHeader(){
+const SegyBinaryHeader* SegyReader::getSegyBinaryHeader() const{
 	SegyBinaryHeader *segy_bin_hdr = new SegyBinaryHeader();
 	if ( 0 != fseek( segy_file, 3600, SEEK_SET ) ){
 		if (0 != fread( segy_bin_hdr, BIN_HEADER_SIZE, 1, segy_file )){
@@ -188,6 +191,52 @@ const SegyBinaryHeader* SegyReader::getSegyBinaryHeader(){
 		return nullptr;
 	}
 	return nullptr;
+}
+
+size_t SegyReader::_getSamples() const{
+	const SegyBinaryHeader *segy_bin_hdr = getSegyBinaryHeader();
+	if ( segy_bin_hdr ){
+		size_t samples = segy_bin_hdr->samples_per_trace;
+		delete segy_bin_hdr;
+		return samples;
+	} else {
+		delete segy_bin_hdr;
+		return 0;
+	}
+}
+
+size_t SegyReader::_getTraces() const{
+	const size_t samples = _getSamples();
+	const size_t data_format = _getDataFormat();
+
+	//set file pointer point to the last trace header
+	if ( 0 != fseek( segy_file, samples * data_bytes[data_format] + 240, SEEK_END ) ){
+
+		SegyTraceHeader *segy_trace_hdr = new SegyTraceHeader();
+
+		if (0 != fread( segy_trace_hdr, TEXT_HEADER_SIZE, 1, segy_file )){
+			swapSegyTraceHeader( segy_trace_hdr );
+			size_t result = segy_trace_hdr->trace_sequence_number_within_cdp_ensemble;
+			delete segy_trace_hdr;
+			return result;
+		} else {
+			fprintf( stderr, "_getTraces(): Read segy file error.\n" );
+			delete segy_trace_hdr;
+			return 0;
+		}
+	}
+}
+
+size_t SegyReader::_getDataFormat() const{
+}
+
+
+
+size_t SegyReader::getSamples() const{
+	return samples;
+}
+size_t SegyReader::getTraces( ) const{
+	return traces;
 }
 
 const SegyTraceHeader *SegyReader::getSegyTraceHeader( const size_t trace_num ){

@@ -155,6 +155,7 @@ private:
 	string						file_name;
 	size_t						traces;
 	size_t						samples;
+	size_t						data_format;
 	FILE						*segy_file;
 
 private:
@@ -165,15 +166,21 @@ private:
 public:
 	static SegyReader			*getInstance( const string file_name );
 	bool						destroy();
-	const SegyBinaryHeader		*getSegyBinaryHeader();
+	const SegyBinaryHeader		*getSegyBinaryHeader() const;
 	const SegyTraceHeader		*getSegyTraceHeader( const size_t trace_num );
 	const float					getSegyData( const size_t trace_num, const size_t sample_num );
 	const size_t				getTracesNum() const;
 	const size_t				getTraceSamplesNum() const;
+	size_t						getTraces() const;
+	size_t						getSamples() const;
+	size_t						getDataFormat() const;
 
 private:
 	bool						convertBinary( void* data, size_t size ) const;
 	void						swapSegyBinaryHeader( SegyBinaryHeader* segy_bin_hdr ) const;
 	void						swapSegyTraceHeader( SegyTraceHeader* segy_trace_hdr ) const;
+	size_t						_getSamples() const;
+	size_t						_getTraces() const;
+	size_t						_getDataFormat() const;
 };
 #endif
