@@ -3,22 +3,30 @@
 SegyReader* SegyReader::instance = nullptr;
 const unsigned int data_bytes[] = { 4, 4, 2, 4, 4, 1 };
  
-void swapByte2( int_16 *data ){
+void swapByte2( int_16 *data, size_t count ){
 	unsigned char tmp = 0;
-	tmp = data[0];
-	data[0] = data[1];
-	data[1] = tmp;
+	size_t i = 0, j = 0;
+
+	for ( i = 0; i < count; ++i ){
+		tmp = data[j + 0];
+		data[j + 0] = data[j + 1];
+		data[j + 1] = tmp;
+	}
 }
 
-void swapByte4( int_32 *data ){
+void swapByte4( int_32 *data, size_t count ){
 	unsigned char tmp = 0;
-	tmp = data[0];
-	data[0] = data[3];
-	data[3] = tmp;
+	size_t i = 0, j = 0;
+	for ( i = 0; i < count; ++i ){
+		j = ( 4 * i );
+		tmp = data[j + 0];
+		data[j + 0] = data[j + 3];
+		data[j + 3] = tmp;
 
-	tmp = data[1];
-	data[1] = data[2];
-	data[2] = tmp;
+		tmp = data[j + 1];
+		data[j + 1] = data[j + 2];
+		data[j + 2] = tmp;
+	}
 }
 
 
@@ -137,14 +145,14 @@ void SegyReader::swapSegyTraceHeader( SegyTraceHeader* segy_trace_hdr ) const{
 	convertBinary( &(segy_trace_hdr->otrav), 2 );
 }
 
-bool SegyReader::convertBinary( void* data, size_t size ) const{
+bool SegyReader::convertBinary( void* data, size_t size, size_t count ) const{
 	switch (size){
 	case 2:
-		swapByte2( (int_16*)data );
+		swapByte2( (int_16*)data, count );
 		return true;
 		break;
 	case 4:
-		swapByte4( (int_32*) data );
+		swapByte4( (int_32*) data, count );
 		return true;
 		break;
 	default:
@@ -153,11 +161,14 @@ bool SegyReader::convertBinary( void* data, size_t size ) const{
 }
 
 void SegyReader::destroy(){
+	fclose( segy_file );
+	delete segy_bin_hdr;
 	delete this;
 }
 
 SegyReader::SegyReader( const string _file_name ) : 
-segy_ebcdic_hdr( nullptr ), segy_bin_hdr( nullptr ), segy_trace_hdr( nullptr ){
+segy_ebcdic_hdr( nullptr ), segy_bin_hdr( nullptr ), data_format(4)
+{
 	if ( nullptr == (segy_file = fopen( _file_name.c_str(), "rb" )) ){
 		fprintf( stderr, "ReadSegy: Cannot open segy file - %s\n", _file_name.c_str() );
 	} else {
@@ -180,7 +191,7 @@ SegyReader* SegyReader::getInstance( const string file_name ){
 
 const SegyBinaryHeader* SegyReader::getSegyBinaryHeader() const{
 	SegyBinaryHeader *segy_bin_hdr = new SegyBinaryHeader();
-	if ( 0 != fseek( segy_file, 3600, SEEK_SET ) ){
+	if ( 0 == fseek( segy_file, 3600, SEEK_SET ) ){
 		if (0 != fread( segy_bin_hdr, BIN_HEADER_SIZE, 1, segy_file )){
 			swapSegyBinaryHeader( segy_bin_hdr );
 			return segy_bin_hdr;
@@ -196,23 +207,29 @@ const SegyBinaryHeader* SegyReader::getSegyBinaryHeader() const{
 }
 
 size_t SegyReader::_getSamples() const{
-	const SegyBinaryHeader *segy_bin_hdr = getSegyBinaryHeader();
 	if ( segy_bin_hdr ){
-		size_t samples = segy_bin_hdr->samples_per_trace;
-		delete segy_bin_hdr;
-		return samples;
+		return segy_bin_hdr->samples_per_trace;
 	} else {
-		delete segy_bin_hdr;
-		return 0;
+		const SegyBinaryHeader *segy_bin_hdr = getSegyBinaryHeader( );
+		if (segy_bin_hdr){
+			size_t samples = segy_bin_hdr->samples_per_trace;
+			delete segy_bin_hdr;
+			return samples;
+		} else {
+			delete segy_bin_hdr;
+			return 0;
+		}
 	}
+	
 }
 
 size_t SegyReader::_getTraces() const{
 	const size_t samples = _getSamples();
 	const size_t data_format = _getDataFormat();
 
+	long offset = 0 - ( samples * data_bytes[data_format] + 240 );
 	//set file pointer point to the last trace header
-	if ( 0 != fseek( segy_file, samples * data_bytes[data_format] + 240, SEEK_END ) ){
+	if ( 0 == fseek( segy_file, offset, SEEK_END ) ){
 
 		SegyTraceHeader *segy_trace_hdr = new SegyTraceHeader();
 
@@ -230,14 +247,18 @@ size_t SegyReader::_getTraces() const{
 }
 
 size_t SegyReader::_getDataFormat() const{
-	const SegyBinaryHeader *segy_bin_hdr = getSegyBinaryHeader( );
-	if (segy_bin_hdr){
-		size_t data_format = segy_bin_hdr->data_sample_format_code;
-		delete segy_bin_hdr;
-		return data_format;
+	if ( segy_bin_hdr ) {
+		return segy_bin_hdr->data_sample_format_code;
 	} else {
-		delete segy_bin_hdr;
-		return 0;
+		const SegyBinaryHeader *segy_bin_hdr = getSegyBinaryHeader( );
+		if (segy_bin_hdr){
+			size_t data_format = segy_bin_hdr->data_sample_format_code;
+			delete segy_bin_hdr;
+			return data_format;
+		} else {
+			delete segy_bin_hdr;
+			return 0;
+		}
 	}
 }
 
@@ -246,18 +267,66 @@ size_t SegyReader::_getDataFormat() const{
 size_t SegyReader::getSamples() const{
 	return samples;
 }
-size_t SegyReader::getTraces( ) const{
+size_t SegyReader::getTraces() const{
 	return traces;
 }
 
+// trace_num range from 1 to max trace_num
 const SegyTraceHeader *SegyReader::getSegyTraceHeader( const size_t trace_num ){
-	if ( trace_num <= traces ){
+	if ( trace_num <= traces && trace_num >= 1 ){
 		SegyTraceHeader* segy_trace_hdr = new SegyTraceHeader();
-
+		if ( 0 == fseek( segy_file, 3600 + (trace_num-1) *(240 + data_bytes[data_format]*samples), SEEK_SET )){
+			if (0 != fread( segy_trace_hdr, TRACE_HEADER_SIZE , 1, segy_file )){
+				swapSegyTraceHeader( segy_trace_hdr );
+				return segy_trace_hdr;
+			}
+		} else {
+			fprintf( stderr, "getSegyTraceHeader(): Read segy file error.\n" );
+			return nullptr;
+		}
 	} else {
-		fprintf( stderr, "getSegyTraceHeader(): Out of traces.\n" );
+		fprintf( stderr, "getSegyTraceHeader(): Out of traces or trace_num should be larger than 0.\n" );
 		return nullptr;
 	}
-	
+}
 
+// trace_num range from 1 to max trace_num
+//read one trace data
+const float* SegyReader::getTraceData( const size_t trace_num ) const{
+	if ( trace_num <= traces && trace_num >= 1 ){
+		//data format default 4, so float type by default
+		float *result = new float[traces];
+		if ( 0 == fseek( segy_file, 3600 + ( trace_num - 1 ) *( 240 + data_bytes[data_format] * samples ) + 240, SEEK_SET ) ){
+			if ( 0 != fread( &result, sizeof( float ), samples, segy_file ) ){
+				convertBinary( result, sizeof( float ), samples );
+				return result;
+			}
+		} else {
+			fprintf( stderr, "getTraceData(): Read segy file error.\n" );
+			return nullptr;
+		}
+	} else {
+		fprintf( stderr, "getTraceData(): Out of traces or trace_num should be larger than 0.\n" );
+		return nullptr;
+	}
+}
+
+const float	SegyReader::getSpecificData( const size_t trace_num, const size_t sample_num ) const{
+	if ( trace_num <= traces && trace_num >= 1 && sample_num <= samples && sample_num >= 1 ){
+		//data format default 4, so float type by default
+		float result { 0 };
+		size_t offset = 3600 + ( trace_num - 1 ) *( 240 + data_bytes[data_format] * samples ) + 240 + ( sample_num - 1 ) * data_bytes[data_format];
+		if ( 0 == fseek( segy_file, offset, SEEK_SET ) ){
+			if ( 0 != fread( &result, sizeof( float ), 1, segy_file ) ){
+				convertBinary( &result, sizeof( float ), 1 );
+				return result;
+			}
+		} else {
+			fprintf( stderr, "getTraceData(): Read segy file error.\n" );
+			return 0;
+		}
+	} else {
+		fprintf( stderr, "getTraceData(): Out of traces or trace_num should be larger than 0.\n" );
+		return 0;
+	}
 }

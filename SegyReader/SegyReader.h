@@ -159,8 +159,8 @@ private:
 	FILE						*segy_file;
 
 	SegyTextHeader				*segy_ebcdic_hdr;
-	const SegyBinaryHeader			*segy_bin_hdr;
-	SegyTraceHeader				*segy_trace_hdr;
+	const SegyBinaryHeader		*segy_bin_hdr;
+	//SegyTraceHeader				*segy_trace_hdr;
 
 private:
 	SegyReader(){}
@@ -178,9 +178,11 @@ public:
 	size_t						getTraces() const;
 	size_t						getSamples() const;
 	size_t						getDataFormat() const;
+	const float					getSpecificData( const size_t trace_num, const size_t sample_num ) const;
+	const float*				getTraceData( const size_t trace_num ) const;
 
 private:
-	bool						convertBinary( void* data, size_t size ) const;
+	bool						convertBinary( void* data, size_t size, size_t count = 1 ) const;
 	void						swapSegyBinaryHeader( SegyBinaryHeader* segy_bin_hdr ) const;
 	void						swapSegyTraceHeader( SegyTraceHeader* segy_trace_hdr ) const;
 	size_t						_getSamples() const;
