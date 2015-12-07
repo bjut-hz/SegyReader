@@ -158,6 +158,10 @@ private:
 	size_t						data_format;
 	FILE						*segy_file;
 
+	SegyTextHeader				*segy_ebcdic_hdr;
+	const SegyBinaryHeader			*segy_bin_hdr;
+	SegyTraceHeader				*segy_trace_hdr;
+
 private:
 	SegyReader(){}
 	SegyReader( const string _file_name );
@@ -165,7 +169,7 @@ private:
 
 public:
 	static SegyReader			*getInstance( const string file_name );
-	bool						destroy();
+	void						destroy();
 	const SegyBinaryHeader		*getSegyBinaryHeader() const;
 	const SegyTraceHeader		*getSegyTraceHeader( const size_t trace_num );
 	const float					getSegyData( const size_t trace_num, const size_t sample_num );

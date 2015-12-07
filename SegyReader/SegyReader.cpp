@@ -152,15 +152,17 @@ bool SegyReader::convertBinary( void* data, size_t size ) const{
 	}
 }
 
-bool SegyReader::destroy(){
+void SegyReader::destroy(){
 	delete this;
 }
 
-SegyReader::SegyReader( const string _file_name ){
+SegyReader::SegyReader( const string _file_name ) : 
+segy_ebcdic_hdr( nullptr ), segy_bin_hdr( nullptr ), segy_trace_hdr( nullptr ){
 	if ( nullptr == (segy_file = fopen( _file_name.c_str(), "rb" )) ){
 		fprintf( stderr, "ReadSegy: Cannot open segy file - %s\n", _file_name.c_str() );
 	} else {
 		file_name = _file_name;
+		segy_bin_hdr = getSegyBinaryHeader();
 		samples = _getSamples();
 		traces = _getTraces();
 		data_format = _getDataFormat();
@@ -228,6 +230,15 @@ size_t SegyReader::_getTraces() const{
 }
 
 size_t SegyReader::_getDataFormat() const{
+	const SegyBinaryHeader *segy_bin_hdr = getSegyBinaryHeader( );
+	if (segy_bin_hdr){
+		size_t data_format = segy_bin_hdr->data_sample_format_code;
+		delete segy_bin_hdr;
+		return data_format;
+	} else {
+		delete segy_bin_hdr;
+		return 0;
+	}
 }
 
 
